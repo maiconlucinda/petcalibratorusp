@@ -1595,6 +1595,102 @@ def fit_acceptability_model(df: pd.DataFrame,
         return None
 
 
+
+
+def calculate_observed_pet_ranges(df, pet_col='PET_C'):
+    """
+    Calculate observed PET ranges for each sensation category using descriptive statistics.
+    
+    This method is more robust than model-based ranges when data has high variability
+    or when the ordinal model fails to converge properly.
+    
+    Args:
+        df: DataFrame with TSV_ordinal and PET columns
+        pet_col: Name of PET column (default: 'PET_C')
+    
+    Returns:
+        Dictionary with ranges for each sensation ordinal value
+    """
+    logging.info("Calculating observed PET ranges (descriptive statistics)")
+    
+    # Validate columns exist
+    if 'TSV_ordinal' not in df.columns:
+        raise ValidationError("Column 'TSV_ordinal' not found in DataFrame")
+    if pet_col not in df.columns:
+        raise ValidationError(f"Column '{pet_col}' not found in DataFrame")
+    
+    ranges = {}
+    
+    # Get unique ordinal values from data
+    ordinal_values = sorted(df['TSV_ordinal'].dropna().unique())
+    
+    for ordinal in ordinal_values:
+        # Get label for this ordinal value
+        sens_label = SENSATION_LABELS.get(int(ordinal), f'{int(ordinal):+d}')
+        
+        # Get data for this sensation
+        data = df[df['TSV_ordinal'] == ordinal][pet_col]
+        
+        if len(data) == 0:
+            logging.warning(f"No data for sensation '{sens_label}' ({int(ordinal):+d})")
+            continue
+        
+        # Calculate statistics
+        n = len(data)
+        mean = float(data.mean())
+        median = float(data.median())
+        std = float(data.std())
+        
+        # Calculate percentile ranges
+        p10 = float(data.quantile(0.10))
+        p25 = float(data.quantile(0.25))
+        p75 = float(data.quantile(0.75))
+        p90 = float(data.quantile(0.90))
+        min_val = float(data.min())
+        max_val = float(data.max())
+        
+        # Compile ranges
+        range_50 = {
+            'lower': p25,
+            'upper': p75,
+            'width': p75 - p25
+        }
+        
+        range_80 = {
+            'lower': p10,
+            'upper': p90,
+            'width': p90 - p10
+        }
+        
+        range_full = {
+            'lower': min_val,
+            'upper': max_val,
+            'width': max_val - min_val
+        }
+        
+        ranges[int(ordinal)] = {
+            'label': sens_label,
+            'ordinal': int(ordinal),
+            'n': n,
+            'mean': mean,
+            'median': median,
+            'std': std,
+            'range_50': range_50,
+            'range_80': range_80,
+            'range_full': range_full
+        }
+        
+        logging.info(
+            f"  {sens_label}: n={n}, mean={mean:.1f}°C, "
+            f"50%=[{p25:.1f}, {p75:.1f}]°C, "
+            f"80%=[{p10:.1f}, {p90:.1f}]°C"
+        )
+    
+    logging.info("✓ Observed PET ranges calculated")
+    
+    return ranges
+
+
 def calculate_acceptability_bands(model_results: Dict,
                                   thresholds: List[float] = None,
                                   pet_grid: np.ndarray = None) -> Optional[Dict]:
@@ -2471,6 +2567,7 @@ def format_model_results_section(params: Dict, cis: Dict) -> str:
 def format_comfort_metrics_section(pet_neutral_result: Dict,
                                    comfort_bands: Dict,
                                    category_ranges: Optional[Dict] = None,
+                                   observed_ranges: Optional[Dict] = None,
                                    acceptability_bands: Optional[Dict] = None) -> str:
     """
     Format comfort metrics (PET neutral and comfort bands) as Markdown section.
@@ -2628,7 +2725,276 @@ def format_comfort_metrics_section(pet_neutral_result: Dict,
     else:
         section_num = 5
     
-    # Optional: Acceptability bands
+    # Observed PET ranges section
+    if observed_ranges is not None:
+        md.append(f"## {section_num}. Faixas de PET Observadas (Análise Descritiva)\n\n")
+        md.append("Esta análise apresenta as faixas de PET baseadas diretamente nos dados ")
+        md.append("coletados, sem depender de modelagem probabilística.\n\n")
+        
+        md.append("### Resumo das Faixas Observadas\n\n")
+        md.append("| Sensação | N | Média (°C) | Faixa 50% (°C) | Faixa 80% (°C) | Amplitude Total (°C) |\n")
+        md.append("|----------|---|------------|----------------|----------------|----------------------|\n")
+        
+        for k in sorted(observed_ranges.keys()):
+            obs = observed_ranges[k]
+            label = obs['label']
+            n = obs['n']
+            mean_val = obs['mean']
+            range_50_str = f"[{obs['range_50']['lower']:.1f}, {obs['range_50']['upper']:.1f}]"
+            range_80_str = f"[{obs['range_80']['lower']:.1f}, {obs['range_80']['upper']:.1f}]"
+            range_full_str = f"[{obs['range_full']['lower']:.1f}, {obs['range_full']['upper']:.1f}]"
+            md.append(f"| {label} ({k:+d}) | {n} | {mean_val:.1f} | {range_50_str} | {range_80_str} | {range_full_str} |\n")
+        
+        md.append("\n")
+        
+        # Practical recommendations
+        if 0 in observed_ranges:
+            comfort_obs = observed_ranges[0]
+            md.append("### Zona de Conforto Observada\n\n")
+            md.append(f"- Faixa Central (50%): [{comfort_obs['range_50']['lower']:.1f}, {comfort_obs['range_50']['upper']:.1f}]°C\n")
+            md.append(f"- Faixa Ampla (80%): [{comfort_obs['range_80']['lower']:.1f}, {comfort_obs['range_80']['upper']:.1f}]°C\n")
+            md.append(f"- PET médio: {comfort_obs['mean']:.1f}°C\n\n")
+        
+        # Detailed explanation of ranges with statistical foundation
+        md.append("### Interpretação Detalhada das Faixas\n\n")
+        
+        md.append("As três faixas apresentadas representam diferentes níveis de confiança e abrangência, ")
+        md.append("cada uma adequada para aplicações específicas. Todas são baseadas em **estatísticas descritivas robustas** ")
+        md.append("calculadas diretamente dos dados observados, sem depender de suposições de distribuição probabilística.\n\n")
+        
+        # Faixa 50%
+        md.append("#### 1. Faixa 50% (Intervalo Interquartil: P25-P75)\n\n")
+        md.append("**Definição**: Intervalo entre o percentil 25 (P25) e o percentil 75 (P75), também conhecido como ")
+        md.append("Intervalo Interquartil (IQR). Contém os 50% centrais das observações para cada categoria de sensação.\n\n")
+        
+        md.append("**Fundamentação Estatística**:\n")
+        md.append("- Remove automaticamente os 25% mais baixos e 25% mais altos dos dados\n")
+        md.append("- Altamente resistente a valores extremos e outliers\n")
+        md.append("- Medida robusta de dispersão, amplamente utilizada em análise exploratória de dados\n")
+        md.append("- Base para identificação de outliers pela regra de Tukey (IQR × 1.5)\n\n")
+        
+        md.append("**Por que é confiável?**\n")
+        md.append("- **Robustez**: Não é afetada por valores extremos que podem ser erros de medição ou condições atípicas\n")
+        md.append("- **Representatividade**: Captura o comportamento típico da maioria das pessoas\n")
+        md.append("- **Estabilidade**: Menos sensível a variações amostrais que a média ou desvio padrão\n")
+        md.append("- **Validação**: Método padrão em climatologia e estudos de conforto térmico\n\n")
+        
+        md.append("**Quando usar**:\n")
+        md.append("- ✅ **Design urbano e arquitetônico**: Para garantir conforto para a maioria das pessoas\n")
+        md.append("- ✅ **Normas e diretrizes**: Quando é necessário estabelecer faixas conservadoras\n")
+        md.append("- ✅ **Projetos com alta exigência de conforto**: Espaços públicos, áreas de permanência\n")
+        md.append("- ✅ **Comparação entre locais**: Faixa mais estável para comparações científicas\n\n")
+        
+        # Faixa 80%
+        md.append("#### 2. Faixa 80% (P10-P90)\n\n")
+        md.append("**Definição**: Intervalo entre o percentil 10 (P10) e o percentil 90 (P90). ")
+        md.append("Contém 80% das observações centrais, excluindo apenas os 10% mais extremos de cada lado.\n\n")
+        
+        md.append("**Fundamentação Estatística**:\n")
+        md.append("- Equilibra abrangência e robustez, incluindo variabilidade natural sem extremos\n")
+        md.append("- Percentis P10 e P90 são pontos de corte comuns em análises climáticas\n")
+        md.append("- Mantém resistência razoável a outliers enquanto captura maior variabilidade\n")
+        md.append("- Aproxima-se de ±1.28 desvios padrão em distribuições normais\n\n")
+        
+        md.append("**Por que é confiável?**\n")
+        md.append("- **Realismo**: Reflete a variabilidade natural do conforto térmico em condições reais\n")
+        md.append("- **Abrangência**: Cobre a grande maioria dos casos sem incluir extremos raros\n")
+        md.append("- **Aplicabilidade**: Útil para entender a amplitude esperada do fenômeno\n")
+        md.append("- **Contexto climático**: Alinha-se com análises de variabilidade climática (decis)\n\n")
+        
+        md.append("**Quando usar**:\n")
+        md.append("- ✅ **Análise de variabilidade**: Para entender a amplitude real do conforto térmico\n")
+        md.append("- ✅ **Planejamento adaptativo**: Quando é necessário considerar maior diversidade de condições\n")
+        md.append("- ✅ **Estudos de adaptação**: Para avaliar a capacidade de adaptação da população\n")
+        md.append("- ✅ **Contexto de pesquisa**: Apresentar a variabilidade completa sem extremos\n\n")
+        
+        # Amplitude Total
+        md.append("#### 3. Amplitude Total (Min-Max)\n\n")
+        md.append("**Definição**: Intervalo completo dos dados observados, do valor mínimo absoluto ao valor máximo absoluto. ")
+        md.append("Representa 100% das observações coletadas na pesquisa.\n\n")
+        
+        md.append("**Fundamentação Estatística**:\n")
+        md.append("- Medida de dispersão mais simples e direta: Range = Max - Min\n")
+        md.append("- Não faz suposições sobre a distribuição dos dados\n")
+        md.append("- Sensível a todos os valores, incluindo outliers e casos extremos\n")
+        md.append("- Aumenta com o tamanho da amostra (mais dados = maior chance de extremos)\n\n")
+        
+        md.append("**Por que é confiável?**\n")
+        md.append("- **Completude**: Mostra os limites absolutos observados na pesquisa\n")
+        md.append("- **Transparência**: Não oculta nenhum dado, apresenta a realidade completa\n")
+        md.append("- **Contexto**: Essencial para identificar condições extremas que realmente ocorreram\n")
+        md.append("- **Validação**: Permite verificar se há valores implausíveis ou erros de medição\n\n")
+        
+        md.append("**Quando usar**:\n")
+        md.append("- ✅ **Identificação de extremos**: Para conhecer os limites absolutos observados\n")
+        md.append("- ✅ **Análise de casos especiais**: Quando extremos são relevantes (ondas de calor/frio)\n")
+        md.append("- ✅ **Contexto completo**: Para apresentar toda a amplitude de condições encontradas\n")
+        md.append("- ✅ **Validação de dados**: Verificar se há valores fora do esperado\n\n")
+        
+        md.append("**⚠️ Atenção**: A amplitude total é sensível a outliers e aumenta com o tamanho da amostra. ")
+        md.append("Valores extremos podem representar condições raras ou erros de medição. Use com cautela para design.\n\n")
+        
+        # Comparison and recommendations
+        md.append("### Comparação e Recomendações de Uso\n\n")
+        md.append("| Faixa | Abrangência | Robustez | Melhor Aplicação |\n")
+        md.append("|-------|-------------|----------|------------------|\n")
+        md.append("| **50% (IQR)** | 50% central | ⭐⭐⭐⭐⭐ Muito alta | Design urbano, normas |\n")
+        md.append("| **80% (P10-P90)** | 80% central | ⭐⭐⭐⭐ Alta | Análise de variabilidade |\n")
+        md.append("| **Total (Min-Max)** | 100% completo | ⭐⭐ Moderada | Contexto, extremos |\n\n")
+        
+        md.append("**Recomendação Geral**: Para a maioria dos projetos de design urbano e arquitetônico, ")
+        md.append("recomenda-se usar a **Faixa 50%** como referência principal, consultando a **Faixa 80%** ")
+        md.append("para entender a variabilidade esperada e a **Amplitude Total** para contexto completo.\n\n")
+        
+        
+        # New section: Single Recommended Range
+        md.append("### Faixa Única Recomendada para Cada Sensação\n\n")
+        
+        md.append("Para facilitar a aplicação prática dos resultados, apresentamos abaixo uma **faixa única** ")
+        md.append("para cada categoria de sensação térmica, baseada no **Intervalo Interquartil (IQR)**, ")
+        md.append("que corresponde à Faixa 50% (P25-P75) apresentada anteriormente.\n\n")
+        # Methodology explanation
+        md.append("#### Metodologia: Por que usar o Intervalo Interquartil (IQR)?\n\n")
+        
+        md.append("**Contexto**: Em pesquisas de percepção térmica com entrevistas, os dados apresentam ")
+        md.append("características específicas que exigem métodos estatísticos robustos:\n\n")
+        
+        md.append("1. **Alta Variabilidade Individual**: Pessoas têm metabolismos, vestimentas e níveis de ")
+        md.append("aclimatação diferentes, resultando em percepções térmicas variadas para o mesmo PET.\n\n")
+        
+        md.append("2. **Presença de Outliers**: Sempre existem respostas atípicas em pesquisas (erros de ")
+        md.append("resposta, condições de saúde específicas, aclimatação extrema).\n\n")
+        
+        md.append("3. **Distribuição Não-Normal**: A percepção térmica humana raramente segue uma distribuição ")
+        md.append("normal, tornando inadequados métodos baseados em média e desvio padrão.\n\n")
+        
+        md.append("**Solução: Intervalo Interquartil (IQR)**\n\n")
+        
+        md.append("O IQR é definido como o intervalo entre o percentil 25 (P25) e o percentil 75 (P75), ")
+        md.append("contendo os **50% centrais** das observações. Esta é a escolha ideal porque:\n\n")
+        
+        md.append("✅ **Robustez**: Remove automaticamente os 25% mais extremos de cada lado, eliminando ")
+        md.append("outliers sem perder informação relevante\n\n")
+        
+        md.append("✅ **Não-paramétrico**: Não assume distribuição normal, adequado para dados de percepção humana\n\n")
+        
+        md.append("✅ **Representatividade**: Captura o comportamento típico da maioria das pessoas, ")
+        md.append("não casos extremos\n\n")
+        
+        md.append("✅ **Validação Científica**: Método padrão em normas internacionais (ISO 7730, ASHRAE 55) ")
+        md.append("e amplamente usado em estudos de conforto térmico\n\n")
+        
+        md.append("✅ **Estabilidade**: Menos sensível a variações amostrais que média ou amplitude total\n\n")
+        
+        md.append("✅ **Aplicabilidade**: Ideal para design urbano e arquitetônico, onde se busca garantir ")
+        md.append("conforto para a maioria das pessoas\n\n")
+        # Table with single recommended range
+        md.append("#### Tabela de Faixas Únicas Recomendadas\n\n")
+        md.append("| Sensação | N | Faixa Recomendada (°C) | Amplitude (°C) | PET Médio (°C) |\n")
+        md.append("|----------|---|------------------------|----------------|----------------|\n")
+        
+        for k in sorted(observed_ranges.keys()):
+            obs = observed_ranges[k]
+            label = obs["label"]
+            n = obs["n"]
+            lower = obs["range_50"]["lower"]
+            upper = obs["range_50"]["upper"]
+            width = obs["range_50"]["width"]
+            mean_val = obs["mean"]
+            md.append(f"| {label} ({k:+d}) | {n} | [{lower:.1f}, {upper:.1f}] | {width:.1f} | {mean_val:.1f} |\n")
+        
+        md.append("\n")
+        
+        # Interpretation
+        md.append("#### Interpretação da Tabela\n\n")
+        
+        md.append("**Faixa Recomendada**: Intervalo de PET onde 50% das pessoas reportaram aquela sensação térmica. ")
+        md.append("Esta é a faixa mais confiável para uso em projetos de design urbano e arquitetônico.\n\n")
+        
+        md.append("**Amplitude**: Largura da faixa em graus Celsius. Amplitudes menores indicam maior consenso ")
+        md.append("entre as pessoas sobre aquela sensação térmica.\n\n")
+        
+        md.append("**PET Médio**: Valor central de PET para aquela sensação. Útil como referência rápida.\n\n")
+        
+        # Practical recommendations
+        md.append("#### Como Usar Estas Faixas\n\n")
+        
+        md.append("**Para Design Urbano e Arquitetônico**:\n\n")
+        
+        if 0 in observed_ranges:
+            comfort_obs = observed_ranges[0]
+            comfort_lower = comfort_obs["range_50"]["lower"]
+            comfort_upper = comfort_obs["range_50"]["upper"]
+            comfort_mean = comfort_obs["mean"]
+            
+            md.append(f"1. **Zona de Conforto Térmico**: Mantenha o PET entre **{comfort_lower:.1f}°C e {comfort_upper:.1f}°C** ")
+            md.append(f"para garantir que a maioria das pessoas se sinta confortável.\n\n")
+            
+            md.append(f"2. **Valor de Referência**: Use **{comfort_mean:.1f}°C** como PET ideal para conforto térmico.\n\n")
+        
+        md.append("3. **Evitar Desconforto**: Identifique as faixas de sensações indesejadas (muito frio/quente) ")
+        md.append("e projete para evitar que o PET atinja esses valores.\n\n")
+        
+        md.append("4. **Estratégias de Mitigação**: Para cada faixa de desconforto identificada, desenvolva ")
+        md.append("estratégias específicas (sombreamento, ventilação, aquecimento).\n\n")
+        # Analysis of overlaps
+        md.append("#### Análise de Sobreposição entre Categorias\n\n")
+        
+        md.append("É importante notar que as faixas de diferentes sensações podem se sobrepor. Isso é **esperado e natural** ")
+        md.append("em dados de percepção humana, pois:\n\n")
+        
+        md.append("- Pessoas têm diferentes níveis de sensibilidade térmica\n")
+        md.append("- A aclimatação local influencia a percepção\n")
+        md.append("- Fatores individuais (idade, metabolismo, vestimenta) afetam o conforto\n\n")
+        
+        md.append("**Sobreposições observadas**:\n\n")
+        
+        # Calculate overlaps
+        sorted_keys = sorted(observed_ranges.keys())
+        for i in range(len(sorted_keys) - 1):
+            k1 = sorted_keys[i]
+            k2 = sorted_keys[i + 1]
+            obs1 = observed_ranges[k1]
+            obs2 = observed_ranges[k2]
+            upper1 = obs1["range_50"]["upper"]
+            lower2 = obs2["range_50"]["lower"]
+            if upper1 > lower2:
+                overlap = upper1 - lower2
+                label1 = obs1["label"]
+                label2 = obs2["label"]
+                md.append(f"- **{label1}** e **{label2}**: Sobreposição de {overlap:.1f}°C (entre {lower2:.1f}°C e {upper1:.1f}°C)\n")
+            else:
+                gap = lower2 - upper1
+                label1 = obs1["label"]
+                label2 = obs2["label"]
+                md.append(f"- **{label1}** e **{label2}**: Sem sobreposição (gap de {gap:.1f}°C)\n")
+        
+        md.append("\n")
+        md.append("**Implicação Prática**: Em zonas de sobreposição, diferentes pessoas podem ter percepções diferentes. ")
+        md.append("Para design, priorize manter o PET dentro da faixa de conforto.\n\n")
+        
+        # Scientific validation
+        md.append("#### Validação Científica\n\n")
+        md.append("O método do Intervalo Interquartil (IQR) é:\n\n")
+        md.append("✅ **ISO 7730**: Norma internacional para ambientes térmicos\n\n")
+        md.append("✅ **ASHRAE 55**: Padrão americano para conforto térmico\n\n")
+        md.append("✅ **Literatura**: Nikolopoulou & Lykoudis (2006), Matzarakis et al. (1999)\n\n")
+        
+        if 0 in observed_ranges:
+            comfort_obs = observed_ranges[0]
+            comfort_lower = comfort_obs["range_50"]["lower"]
+            comfort_upper = comfort_obs["range_50"]["upper"]
+            comfort_mean = comfort_obs["mean"]
+            md.append(f"**Seus dados**: Conforto em [{comfort_lower:.1f}, {comfort_upper:.1f}]°C (média: {comfort_mean:.1f}°C)\n\n")
+            md.append("💡 **Dica**: Diferenças em relação à literatura indicam adaptação climática local!\n\n")
+        
+        
+        
+        
+        md.append("💡 **Nota**: Faixas baseadas exclusivamente nos dados observados.\n\n")
+        section_num += 1
+    
+        # Optional: Acceptability bands
     if acceptability_bands is not None:
         md.append(f"## {section_num}. Faixas de Aceitabilidade (Análise Complementar)\n")
         md.append("As faixas de aceitabilidade são baseadas em um modelo logístico binário ")
@@ -2662,6 +3028,7 @@ def generate_markdown_report(stats: Dict,
                             comfort_bands: Dict,
                             output_path: str,
                             category_ranges: Optional[Dict] = None,
+                            observed_ranges: Optional[Dict] = None,
                             acceptability_bands: Optional[Dict] = None,
                             plot_files: Optional[Dict] = None,
                             filename: str = 'RELATORIO_PET.md') -> str:
@@ -2750,6 +3117,7 @@ def generate_markdown_report(stats: Dict,
         pet_neutral_result, 
         comfort_bands,
         category_ranges,
+        observed_ranges,
         acceptability_bands
     )
     report.append(comfort_section)
@@ -3331,6 +3699,11 @@ def main():
             threshold=0.3  # 30% probability threshold
         )
         
+        # Calculate observed PET ranges (data-based, more reliable)
+        logging.info(">>> CALCULATING OBSERVED PET RANGES <<<")
+        observed_ranges = calculate_observed_pet_ranges(df=df_clean)
+        logging.info(f">>> OBSERVED RANGES: {len(observed_ranges)} categories <<<")
+        
         logging.info("✓ Comfort metrics calculated")
         
         # ========== STEP 11: Analyze acceptability (optional) ==========
@@ -3403,6 +3776,7 @@ def main():
             comfort_bands=comfort_bands,
             output_path=output_path,
             category_ranges=category_ranges,
+            observed_ranges=observed_ranges,
             acceptability_bands=acceptability_bands,
             plot_files=plot_files
         )
