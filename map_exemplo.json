@@ -1,0 +1,30 @@
+{
+  "_comment": "Arquivo de exemplo para mapeamento de colunas do CSV/Excel",
+  "_description": "Este arquivo mapeia os nomes das colunas no seu arquivo de dados para os nomes esperados pelo sistema",
+  "_usage": "python pet_calibrator.py --input dados.csv --out resultados --map map_exemplo.json",
+  
+  "_required_mappings": {
+    "PET_C": "Nome da coluna que contém os valores de PET pré-calculados (em °C)",
+    "Sensation": "Nome da coluna que contém a sensação térmica (7 categorias)"
+  },
+  
+  "_optional_mappings": {
+    "Acceptability": "Nome da coluna de aceitabilidade térmica (opcional)",
+    "Timestamp": "Nome da coluna com data/hora da resposta (opcional)"
+  },
+  
+  "_sensation_categories": [
+    "muito frio",
+    "frio",
+    "frio moderado",
+    "confortável",
+    "calor moderado",
+    "quente",
+    "muito quente"
+  ],
+  
+  "PET_C": "Temperatura_Equivalente_PET",
+  "Sensation": "Neste exato momento, eu estou sentindo:",
+  "Acceptability": "Para mim, este local é:",
+  "Timestamp": "Carimbo de data/hora"
+}

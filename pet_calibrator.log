@@ -1,0 +1,33 @@
+2025-11-09 20:46:44 - INFO - Mapping sensation values to ordinal scale
+2025-11-09 20:46:44 - WARNING - Found 1 rows with unmapped sensation values.
+Unmapped values: ['invalid_value']
+Valid sensations: ['muito frio', 'frio', 'frio moderado', 'confortavel', 'calor moderado', 'quente', 'muito quente']
+2025-11-09 20:46:44 - INFO - Successfully mapped 8 rows to ordinal scale
+2025-11-09 20:46:44 - INFO - Sensation distribution:
+2025-11-09 20:46:44 - INFO -   Muito Frio (-3): 1 responses
+2025-11-09 20:46:44 - INFO -   Frio (-2): 1 responses
+2025-11-09 20:46:44 - INFO -   Frio Moderado (-1): 1 responses
+2025-11-09 20:46:44 - INFO -   Confortável (+0): 2 responses
+2025-11-09 20:46:44 - INFO -   Calor Moderado (+1): 1 responses
+2025-11-09 20:46:44 - INFO -   Quente (+2): 1 responses
+2025-11-09 20:46:44 - INFO -   Muito Quente (+3): 1 responses
+2025-11-09 20:46:44 - INFO - Validating PET values in column 'PET_C'
+2025-11-09 20:46:44 - WARNING - Found 1 rows with missing PET values (NaN or empty)
+2025-11-09 20:46:44 - WARNING - Found 1 PET values below plausible minimum (-20.0°C). Minimum value: -25.0°C. These values will be kept for analysis but may indicate data issues.
+2025-11-09 20:46:44 - WARNING - Found 1 PET values above plausible maximum (60.0°C). Maximum value: 70.0°C. These values will be kept for analysis but may indicate data issues.
+2025-11-09 20:46:44 - INFO - PET statistics for valid values:
+2025-11-09 20:46:44 - INFO -   Mean: 23.84°C
+2025-11-09 20:46:44 - INFO -   Median: 23.70°C
+2025-11-09 20:46:44 - INFO -   Std Dev: 26.10°C
+2025-11-09 20:46:44 - INFO -   Range: [-25.00, 70.00]°C
+2025-11-09 20:46:44 - INFO - Removing invalid rows
+2025-11-09 20:46:44 - INFO - Data cleaning summary:
+2025-11-09 20:46:44 - INFO -   Total rows: 9
+2025-11-09 20:46:44 - INFO -   Rows with invalid PET: 1
+2025-11-09 20:46:44 - INFO -   Rows with invalid sensation: 1
+2025-11-09 20:46:44 - INFO -   Rows with both invalid: 0
+2025-11-09 20:46:44 - INFO -   Total rows removed: 2
+2025-11-09 20:46:44 - INFO -   Rows retained: 7 (77.8%)
+2025-11-09 20:46:44 - WARNING - Only 7 valid observations remaining. Minimum recommended: 30. Model results may be unstable.
+2025-11-09 20:46:44 - INFO - Saving cleaned data to /var/folders/71/gpmh1mj92pvb7q0yv2br2vwm0000gq/T/tmpth4lh_gb/respostas_com_PET.csv
+2025-11-09 20:46:44 - INFO - Successfully saved 7 rows and 3 columns to /var/folders/71/gpmh1mj92pvb7q0yv2br2vwm0000gq/T/tmpth4lh_gb/respostas_com_PET.csv
