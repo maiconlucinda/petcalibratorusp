@@ -487,6 +487,123 @@ Diferenças indicam **adaptação climática e cultural** da população estudad
 
 **Dica**: Use a seção "Faixas de PET por Categoria" do relatório para comparar suas faixas locais com valores de referência da literatura.
 
+### Faixas de PET Observadas (Análise Descritiva)
+
+O sistema também calcula **faixas de PET baseadas diretamente nos dados observados**, sem depender de modelagem probabilística. Esta é uma abordagem mais robusta quando as suposições do modelo são violadas ou quando há alta sobreposição entre categorias.
+
+#### O que são as Faixas Observadas?
+
+Para cada categoria de sensação térmica, o sistema calcula três tipos de faixas baseadas em **percentis**:
+
+1. **Faixa 50% (P25-P75)**: Intervalo Interquartil (IQR)
+   - Contém os 50% centrais das observações
+   - Remove automaticamente os 25% mais extremos de cada lado
+   - **Mais robusta** a outliers e valores atípicos
+
+2. **Faixa 80% (P10-P90)**: Intervalo Amplo
+   - Contém 80% das observações centrais
+   - Exclui apenas os 10% mais extremos de cada lado
+   - **Mais abrangente**, mostra variabilidade real
+
+3. **Amplitude Total (Min-Max)**: Intervalo Completo
+   - Do valor mínimo ao máximo observado
+   - Representa 100% dos dados coletados
+   - **Mostra extremos** absolutos encontrados
+
+#### Exemplo de Faixas Observadas
+
+**Categoria "Confortável" (0)**:
+- **Faixa 50%**: [22.9, 24.5]°C (amplitude: 1.6°C)
+- **Faixa 80%**: [21.9, 25.5]°C (amplitude: 3.6°C)
+- **Amplitude Total**: [21.1, 27.7]°C (amplitude: 6.6°C)
+- **PET Médio**: 23.9°C
+- **N**: 42 observações
+
+**Interpretação**:
+- 50% das pessoas que se sentiram confortáveis tinham PET entre 22.9-24.5°C
+- 80% das pessoas confortáveis tinham PET entre 21.9-25.5°C
+- O intervalo completo observado foi de 21.1-27.7°C (incluindo casos extremos)
+
+### Faixa Única Recomendada para Cada Sensação
+
+Para facilitar a aplicação prática, o sistema identifica uma **faixa única** para cada categoria de sensação, baseada no **Intervalo Interquartil (IQR)**.
+
+#### Por que usar o Intervalo Interquartil (IQR)?
+
+Para dados de **entrevistas com pessoas** sobre percepção térmica, o IQR (P25-P75) é a melhor escolha porque:
+
+**Contexto dos Dados**:
+1. **Alta Variabilidade Individual**: Pessoas têm metabolismos, vestimentas e aclimatação diferentes
+2. **Presença de Outliers**: Sempre existem respostas atípicas em pesquisas
+3. **Distribuição Não-Normal**: Percepção térmica raramente segue distribuição normal
+
+**Vantagens do IQR**:
+- ✅ **Robustez**: Remove automaticamente os 25% mais extremos de cada lado
+- ✅ **Não-paramétrico**: Não assume distribuição normal
+- ✅ **Representatividade**: Captura comportamento típico da maioria
+- ✅ **Validação Científica**: Método padrão em ISO 7730 e ASHRAE 55
+- ✅ **Estabilidade**: Menos sensível a variações amostrais
+- ✅ **Aplicabilidade**: Ideal para design urbano e arquitetônico
+
+#### Exemplo de Tabela de Faixas Únicas
+
+| Sensação | N | Faixa Recomendada (°C) | Amplitude (°C) | PET Médio (°C) |
+|----------|---|------------------------|----------------|----------------|
+| Muito Frio (-3) | 21 | [13.4, 15.5] | 2.1 | 14.5 |
+| Frio (-2) | 110 | [14.1, 15.8] | 1.7 | 15.0 |
+| Frio Moderado (-1) | 236 | [14.3, 16.1] | 1.8 | 15.7 |
+| **Confortável (+0)** | **516** | **[14.9, 27.4]** | **12.5** | **20.8** |
+| Calor Moderado (+1) | 174 | [27.1, 31.8] | 4.7 | 28.9 |
+| Quente (+2) | 275 | [28.4, 32.5] | 4.1 | 30.2 |
+| Muito Quente (+3) | 526 | [30.6, 36.2] | 5.6 | 33.3 |
+
+#### Como Usar a Faixa Única
+
+**Para Design Urbano e Arquitetônico**:
+
+1. **Zona de Conforto Térmico**: Mantenha o PET entre **14.9°C e 27.4°C** para garantir que a maioria das pessoas se sinta confortável
+
+2. **Valor de Referência**: Use **20.8°C** como PET ideal para conforto térmico
+
+3. **Evitar Desconforto**: Identifique as faixas de sensações indesejadas (muito frio/quente) e projete para evitar que o PET atinja esses valores
+
+4. **Estratégias de Mitigação**: 
+   - Para calor: sombreamento, ventilação, superfícies refletivas
+   - Para frio: aquecimento, proteção contra vento, materiais térmicos
+
+#### Análise de Sobreposição
+
+É importante notar que as faixas de diferentes sensações podem se sobrepor. Isso é **esperado e natural** em dados de percepção humana porque:
+
+- Pessoas têm diferentes níveis de sensibilidade térmica
+- A aclimatação local influencia a percepção
+- Fatores individuais (idade, metabolismo, vestimenta) afetam o conforto
+
+**Exemplo de Sobreposições**:
+- **Confortável** e **Calor Moderado**: Sobreposição de 0.3°C (entre 27.1°C e 27.4°C)
+- **Calor Moderado** e **Quente**: Sobreposição de 3.4°C (entre 28.4°C e 31.8°C)
+
+**Implicação Prática**: Em zonas de sobreposição, diferentes pessoas podem ter percepções diferentes. Para design, priorize manter o PET dentro da faixa de conforto (sem sobreposição com categorias de desconforto).
+
+#### Validação Científica
+
+O método do Intervalo Interquartil (IQR) para definir faixas de conforto térmico é:
+
+- ✅ **Recomendado pela ISO 7730**: Norma internacional para ambientes térmicos moderados
+- ✅ **Usado pela ASHRAE 55**: Padrão americano para conforto térmico em edificações
+- ✅ **Aplicado em estudos de referência**: Nikolopoulou & Lykoudis (2006), Matzarakis et al. (1999)
+- ✅ **Adequado para calibração local**: Permite comparação entre diferentes climas e populações
+
+#### Comparação das Três Faixas
+
+| Faixa | Abrangência | Robustez | Melhor Aplicação |
+|-------|-------------|----------|------------------|
+| **50% (IQR)** | 50% central | ⭐⭐⭐⭐⭐ Muito alta | Design urbano, normas |
+| **80% (P10-P90)** | 80% central | ⭐⭐⭐⭐ Alta | Análise de variabilidade |
+| **Total (Min-Max)** | 100% completo | ⭐⭐ Moderada | Contexto, extremos |
+
+**Recomendação Geral**: Para a maioria dos projetos de design urbano e arquitetônico, use a **Faixa 50%** como referência principal, consultando a **Faixa 80%** para entender a variabilidade esperada e a **Amplitude Total** para contexto completo.
+
 ---
 
 ## 📈 Exemplos de Visualizações
